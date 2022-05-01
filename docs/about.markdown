@@ -1,6 +1,6 @@
 ---
 layout: page
-title: About
+title: wonda-tea-coffee's blog
 permalink: /about/
 ---
 
