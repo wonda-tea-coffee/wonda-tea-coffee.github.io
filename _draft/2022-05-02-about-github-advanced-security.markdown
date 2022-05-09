@@ -34,8 +34,8 @@ I don't see why a user who has not authored in the last 90 days would use the Gi
 
 - [ ] [Keeping your organization secure](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure)
 
-- [ ] [Code security](https://docs.github.com/en/enterprise-cloud@latest/code-security)
+- [ ] [Managing security managers in your organization](https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-peoples-access-to-your-organization-with-roles/managing-security-managers-in-your-organization)
 
-- [ ] [Enterprise administrators](https://docs.github.com/en/enterprise-cloud@latest/admin)
+- [ ] [Code security](https://docs.github.com/en/enterprise-cloud@latest/code-security)
 
 - [ ] [github/roadmap](https://github.com/github/roadmap/issues?q=is%3Aissue+is%3Aopen+label%3A%22github+advanced+security%22)
