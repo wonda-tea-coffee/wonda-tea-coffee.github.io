@@ -28,9 +28,9 @@ I don't see why a user who has not authored in the last 90 days would use the Gi
 
 - [x] [Using starter workflows](https://docs.github.com/en/enterprise-cloud@latest/actions/using-workflows/using-starter-workflows)
 
-- [ ] [GitHub Actions / Security guides](https://docs.github.com/en/actions/security-guides)
+- [x] [GitHub Actions / Security guides](https://docs.github.com/en/actions/security-guides)
 
-- [ ] [About GitHub's use of your data](https://docs.github.com/en/enterprise-cloud@latest/get-started/privacy-on-github/about-githubs-use-of-your-data)
+- [x] [About GitHub's use of your data](https://docs.github.com/en/enterprise-cloud@latest/get-started/privacy-on-github/about-githubs-use-of-your-data)
 
 - [ ] [Keeping your organization secure](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure)
 
@@ -38,6 +38,6 @@ I don't see why a user who has not authored in the last 90 days would use the Gi
 
 - [ ] [Enterprise administrators](https://docs.github.com/en/enterprise-cloud@latest/admin)
 
-- [ ] [github/roadmap](https://github.com/github/roadmap/issues?q=is%3Aissue+is%3Aopen+label%3A%22github+advanced+security%22)
+- [ ] [Security hardening your deployments](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments)
 
-- [ ] https://docs.github.com/en/actions/deployment/security-hardening-your-deployments
+- [ ] [github/roadmap](https://github.com/github/roadmap/issues?q=is%3Aissue+is%3Aopen+label%3A%22github+advanced+security%22)
