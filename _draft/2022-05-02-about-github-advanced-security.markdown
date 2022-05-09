@@ -34,7 +34,7 @@ I don't see why a user who has not authored in the last 90 days would use the Gi
 
 - [x] [Keeping your organization secure](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure)
 
-- [ ] [Managing security managers in your organization](https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-peoples-access-to-your-organization-with-roles/managing-security-managers-in-your-organization)
+- [x] [Managing security managers in your organization](https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-peoples-access-to-your-organization-with-roles/managing-security-managers-in-your-organization)
 
 - [ ] [Code security](https://docs.github.com/en/enterprise-cloud@latest/code-security)
 
