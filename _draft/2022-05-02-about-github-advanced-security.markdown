@@ -38,6 +38,4 @@ I don't see why a user who has not authored in the last 90 days would use the Gi
 
 - [ ] [Enterprise administrators](https://docs.github.com/en/enterprise-cloud@latest/admin)
 
-- [ ] [Security hardening your deployments](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments)
-
 - [ ] [github/roadmap](https://github.com/github/roadmap/issues?q=is%3Aissue+is%3Aopen+label%3A%22github+advanced+security%22)
