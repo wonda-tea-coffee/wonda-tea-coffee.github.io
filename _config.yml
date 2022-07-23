@@ -28,7 +28,6 @@ github_username:  wonda-tea-coffee
 # Build settings
 theme: minima
 plugins:
-  - jekyll-feed
   - jekyll-seo-tag
 
 # Exclude from processing.
